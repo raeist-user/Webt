@@ -52,7 +52,7 @@ const diceIcon = document.getElementById('dice-icon');
                                                                                         artistName.innerText = s.a;
                                                                                             
                                                                                                 // Construct the absolute Raw GitHub URL
-                                                                                                    audio.src = GITHUB_RAW_BASE + s.file;
+                                                                                                    audio.src = https://raw.githubusercontent.com/raeist-user/Webt/main/music/ + s.file;
                                                                                                         
                                                                                                             audio.play().catch(e => {
                                                                                                                     console.error("Link Error: Is '" + s.file + "' in the 'music' folder on GitHub?");
