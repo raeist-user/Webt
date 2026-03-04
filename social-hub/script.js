@@ -34,7 +34,7 @@ const container = document.getElementById('song-list-container');
                                
                                        // Filter only audio files and build the playlist
                                                songs = files
-                                                           .filter(file => file.name.match(/\.(mp3|wav|m4a|ogg)$/i))
+                                                           .filter(file => file.name.match(/\.(mp3|wav|irc|ogg)$/i))
                                                                        .map(file => {
                                                                                        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ');
                                                                                                        return {
