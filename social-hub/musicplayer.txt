@@ -1,0 +1,307 @@
+upload your .mp3 files to a folder named music in a repository, your URL format will look like this: https://raw.githubusercontent.com/USER/REPO/branch/music/song.mp3.
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap');
+
+        :root { --bg: #ffffff; --main: #000000; --sub: #999999; --border: #eeeeee; }
+        
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: var(--bg); color: var(--main);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            margin: 0; user-select: none;
+        }
+
+        .container { width: 100%; max-width: 400px; padding: 20px; }
+
+        .music-player-card { 
+            border: 1px solid var(--border); 
+            border-radius: 28px; 
+            background: rgba(128, 128, 128, 0.03); 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .player-header { 
+            padding: 20px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+        }
+
+        .song-info-click {
+            cursor: pointer;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .player-controls-area {
+            max-height: 0; opacity: 0; padding: 0 20px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+        .is-expanded .player-controls-area {
+            max-height: 130px; opacity: 1; padding: 0 20px 24px 20px;
+            pointer-events: auto;
+        }
+
+        .progress-wrapper { 
+            flex: 1; 
+            max-width: 160px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            height: 46px; 
+        }
+
+        .custom-slider {
+            -webkit-appearance: none; width: 100%; height: 4px; background: var(--border); border-radius: 2px; outline: none; margin: 0;
+        }
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--main); cursor: pointer;
+        }
+
+        .play-btn-circle {
+            width: 46px; height: 46px; border-radius: 50%; background: var(--main); color: var(--bg);
+            display: flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .play-btn-circle:active { transform: scale(0.9); }
+
+        .volume-container { position: relative; display: flex; align-items: center; justify-content: center; height: 46px; }
+        .volume-popover {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            background: var(--bg); border: 1px solid var(--border); border-radius: 20px; 
+            padding: 12px 8px; height: 100px; display: none; flex-direction: column; z-index: 10;
+        }
+        .volume-popover.active { display: flex; }
+        .vertical-slider { -webkit-appearance: slider-vertical; width: 4px; height: 80px; }
+
+        .overlay { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: none; flex-direction: column; padding: 24px; }
+        .overlay.active { display: flex; opacity: 1; pointer-events: auto; }
+        .song-item { padding: 16px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .song-item:hover { background: rgba(0,0,0,0.02); }
+        
+        .header-btn { 
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; 
+            opacity: 0.3; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; 
+        }
+        .header-btn:hover { opacity: 1; }
+        .header-btn:active { transform: scale(0.8); }
+
+        .dice-roll {
+            animation: roll 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .song-list-scroll { flex: 1; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+    <audio id="main-audio"></audio>
+
+    <div class="container">
+        <div class="music-player-card" id="music-player">
+            <!-- Header -->
+            <div class="player-header">
+                <div class="song-info-click" id="open-library">
+                    <span class="text-[0.65rem] uppercase opacity-50 tracking-widest font-bold" id="status-label">Local Mix</span>
+                    <span class="text-[1rem] font-semibold truncate" id="song-title">GitHub Library</span>
+                    <span class="text-[0.7rem] opacity-40" id="artist-name">Tap to select song</span>
+                </div>
+                
+                <div class="flex items-center gap-1">
+                    <div class="header-btn" id="random-btn" title="Shuffle">
+                        <i class="fas fa-dice text-lg" id="dice-icon"></i>
+                    </div>
+                    <div class="header-btn" id="toggle-menu" title="Controls">
+                        <i class="fas fa-sliders-h text-lg"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Area -->
+            <div class="player-controls-area">
+                <div class="flex items-center justify-center gap-6 h-[46px]">
+                    <div class="play-btn-circle" id="play-pause-btn">
+                        <i class="fas fa-play ml-1" id="play-icon"></i>
+                    </div>
+
+                    <div class="progress-wrapper">
+                        <input type="range" class="custom-slider" id="progress-bar" value="0" step="0.1">
+                        <div class="flex justify-between text-[0.6rem] font-bold opacity-40 mt-1">
+                            <span id="time-current">0:00</span>
+                            <span id="time-total">0:00</span>
+                        </div>
+                    </div>
+
+                    <div class="volume-container">
+                        <div class="volume-popover" id="volume-popover">
+                            <input type="range" class="vertical-slider" id="volume-bar" value="80" max="100">
+                        </div>
+                        <div class="header-btn !opacity-40 hover:!opacity-100" id="volume-btn">
+                            <i class="fas fa-volume-up"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Overlay -->
+    <div class="overlay" id="playlist-overlay">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-xl font-bold">Cloud Library</h2>
+                <p class="text-[0.65rem] opacity-40 uppercase tracking-widest">GitHub Hosted Music</p>
+            </div>
+            <button id="close-overlay" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <div id="song-list-container" class="song-list-scroll"></div>
+    </div>
+
+    <script>
+        const audio = document.getElementById('main-audio');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const progressBar = document.getElementById('progress-bar');
+        const timeCurrent = document.getElementById('time-current');
+        const timeTotal = document.getElementById('time-total');
+        const songTitle = document.getElementById('song-title');
+        const artistName = document.getElementById('artist-name');
+        const volumeBtn = document.getElementById('volume-btn');
+        const volumePopover = document.getElementById('volume-popover');
+        const volumeBar = document.getElementById('volume-bar');
+        const musicPlayer = document.getElementById('music-player');
+        const randomBtn = document.getElementById('random-btn');
+        const diceIcon = document.getElementById('dice-icon');
+
+        /* TO PLAY FROM GITHUB:
+           1. Upload your music to a GitHub Repo.
+           2. Get the "Raw" URL for each file.
+           3. Format: https://raw.githubusercontent.com/username/repo/branch/folder/song.mp3
+        */
+        const songs = [
+            { t: "Tum Se Hi", a: "Mohit Chauhan", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+            { t: "Kun Faya Kun", a: "A.R. Rahman", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+            { t: "Agar Tum Saath Ho", a: "Alka Yagnik", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+            { t: "Dil Diyan Gallan", a: "Atif Aslam", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" }
+        ];
+
+        function formatTime(secs) {
+            if (isNaN(secs)) return "0:00";
+            const min = Math.floor(secs / 60);
+            const sec = Math.floor(secs % 60);
+            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        function loadSong(index) {
+            const s = songs[index];
+            songTitle.innerText = s.t;
+            artistName.innerText = s.a;
+            audio.src = s.src;
+            audio.play().catch(e => console.log("Playback blocked or link broken. Ensure you use raw.githubusercontent URLs."));
+            playIcon.className = "fas fa-pause";
+            musicPlayer.classList.add('is-expanded');
+            document.getElementById('status-label').innerText = "Now Playing";
+        }
+
+        document.getElementById('open-library').onclick = () => {
+            document.getElementById('playlist-overlay').classList.add('active');
+        };
+
+        document.getElementById('toggle-menu').onclick = () => {
+            musicPlayer.classList.toggle('is-expanded');
+        };
+
+        randomBtn.onclick = (e) => {
+            e.stopPropagation();
+            diceIcon.classList.remove('dice-roll');
+            void diceIcon.offsetWidth; 
+            diceIcon.classList.add('dice-roll');
+            const randomIndex = Math.floor(Math.random() * songs.length);
+            loadSong(randomIndex);
+        };
+
+        playPauseBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (!audio.src) { loadSong(0); return; }
+            if (audio.paused) {
+                audio.play();
+                playIcon.className = "fas fa-pause";
+            } else {
+                audio.pause();
+                playIcon.className = "fas fa-play ml-1";
+            }
+        };
+
+        audio.ontimeupdate = () => {
+            const per = (audio.currentTime / audio.duration) * 100;
+            progressBar.value = per || 0;
+            timeCurrent.innerText = formatTime(audio.currentTime);
+            if (!isNaN(audio.duration)) timeTotal.innerText = formatTime(audio.duration);
+        };
+
+        progressBar.oninput = () => {
+            const time = (progressBar.value / 100) * audio.duration;
+            audio.currentTime = time;
+        };
+
+        volumeBtn.onclick = (e) => {
+            e.stopPropagation();
+            volumePopover.classList.toggle('active');
+        };
+
+        volumeBar.oninput = () => {
+            audio.volume = volumeBar.value / 100;
+        };
+
+        document.getElementById('close-overlay').onclick = () => {
+            document.getElementById('playlist-overlay').classList.remove('active');
+        };
+
+        const container = document.getElementById('song-list-container');
+        songs.forEach((s, i) => {
+            const div = document.createElement('div');
+            div.className = "song-item";
+            div.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-black/5 rounded-lg flex items-center justify-center text-xs font-bold">${i+1}</div>
+                    <div>
+                        <div class="font-bold text-[0.9rem]">${s.t}</div>
+                        <div class="text-[0.7rem] opacity-40 uppercase tracking-tight">${s.a}</div>
+                    </div>
+                </div>
+                <i class="fas fa-cloud-download-alt text-lg opacity-10"></i>
+            `;
+            div.onclick = () => {
+                loadSong(i);
+                document.getElementById('playlist-overlay').classList.remove('active');
+            };
+            container.appendChild(div);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!volumeBtn.contains(e.target) && !volumePopover.contains(e.target)) {
+                volumePopover.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
