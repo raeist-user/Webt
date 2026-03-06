@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Auth</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #f7f7f5;
+      font-family: 'Courier New', monospace;
+    }
+
+    .card { width: 280px; }
+
+    .tabs {
+      display: flex; gap: 1.2rem;
+      margin-bottom: 2rem;
+    }
+
+    .tab {
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-family: inherit; font-size: 0.8rem;
+      color: #ccc; position: relative;
+      transition: color 0.2s;
+    }
+
+    .tab.active { color: #111; }
+    .tab.active::after {
+      content: '';
+      position: absolute; bottom: -3px; left: 0; right: 0;
+      height: 1px; background: #111;
+    }
+
+    input {
+      display: block; width: 100%;
+      padding: 0.65rem 0;
+      background: none; border: none;
+      border-bottom: 1px solid #ddd;
+      font-family: inherit; font-size: 0.9rem;
+      color: #111; outline: none;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input::placeholder { color: #bbb; }
+    input:focus { border-color: #111; }
+
+    button.submit {
+      width: 100%; margin-top: 1.2rem;
+      padding: 0.65rem;
+      background: #111; border: none; border-radius: 4px;
+      color: #fff; font-family: inherit;
+      font-size: 0.8rem; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button.submit:hover { opacity: 0.8; }
+    button.submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .msg {
+      margin-top: 0.9rem;
+      font-size: 0.75rem; min-height: 1em;
+    }
+    .msg.err { color: #c0392b; }
+    .msg.ok  { color: #27ae60; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" id="tLogin"  onclick="mode='login';  render()">sign_in</button>
+    <button class="tab"        id="tSignup" onclick="mode='signup'; render()">sign_up</button>
+  </div>
+
+  <input type="text"     id="username" placeholder="username" autocomplete="username"/>
+  <input type="password" id="password" placeholder="password"/>
+
+  <button class="submit" id="btn" onclick="submit()">sign_in →</button>
+  <p class="msg" id="msg"></p>
+</div>
+
+<script>
+  let mode = "login";
+
+  function render() {
+    document.getElementById("tLogin").classList.toggle("active",  mode === "login");
+    document.getElementById("tSignup").classList.toggle("active", mode === "signup");
+    document.getElementById("btn").textContent = mode === "login" ? "sign_in →" : "sign_up →";
+    document.getElementById("msg").textContent = "";
+    document.getElementById("msg").className = "msg";
+  }
+
+  async function submit() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    const btn = document.getElementById("btn");
+    const msg = document.getElementById("msg");
+
+    if (!username || !password) { show("fill in both fields.", "err"); return; }
+
+    btn.disabled = true;
+    btn.textContent = "…";
+
+    try {
+      const res  = await fetch(`/api/auth/${mode === "login" ? "login" : "register"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.token) localStorage.setItem("token", data.token);
+        show(data.message, "ok");
+      } else {
+        show(data.message, "err");
+      }
+    } catch {
+      show("server unreachable.", "err");
+    } finally {
+      btn.disabled = false;
+      render();
+    }
+  }
+
+  function show(text, cls) {
+    const el = document.getElementById("msg");
+    el.textContent = text;
+    el.className = `msg ${cls}`;
+  }
+
+  document.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+</script>
+</body>
+</html>
