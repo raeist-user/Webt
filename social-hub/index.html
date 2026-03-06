@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spotify Playlist Extractor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #080808;
+      --surface: #111111;
+      --surface2: #1a1a1a;
+      --border: #2a2a2a;
+      --gold: #c8a96e;
+      --gold-dim: #8a7149;
+      --green: #1DB954;
+      --text: #e8e8e8;
+      --muted: #666;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      width: 800px; height: 400px;
+      background: radial-gradient(ellipse, rgba(29,185,84,0.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* HEADER */
+    header {
+      padding: 32px 0 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: var(--green); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 20px rgba(29,185,84,0.3);
+    }
+    .logo-icon svg { width: 22px; height: 22px; fill: #000; }
+    .logo-text h1 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.03em; }
+    .logo-text span { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+    .header-actions { display: flex; gap: 12px; align-items: center; }
+    #user-badge {
+      display: none; align-items: center; gap: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 14px 6px 8px; font-size: 12px;
+    }
+    #user-badge img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+    #user-badge.visible { display: flex; }
+
+    /* BUTTONS */
+    .btn {
+      font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500;
+      letter-spacing: 0.05em; border: none; border-radius: 6px; padding: 10px 20px;
+      cursor: pointer; transition: all 0.18s ease;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: var(--green); color: #000; font-weight: 700; }
+    .btn-primary:hover { background: #1ed760; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(29,185,84,0.35); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: #444; }
+    .btn-gold { background: var(--gold); color: #000; font-weight: 700; }
+    .btn-gold:hover { background: #d9bc84; transform: translateY(-1px); }
+    .btn-sm { padding: 6px 12px; font-size: 11px; }
+
+    /* SETUP */
+    #setup-panel { padding: 48px 0; text-align: center; }
+    .setup-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px 36px;
+      max-width: 540px; margin: 0 auto; position: relative; overflow: hidden;
+    }
+    .setup-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 2px; background: linear-gradient(90deg, transparent, var(--green), transparent);
+    }
+    .setup-card h2 {
+      font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 900;
+      margin-bottom: 10px; line-height: 1.2;
+    }
+    .setup-card h2 em { color: var(--green); font-style: normal; }
+    .setup-card > p { color: var(--muted); font-size: 12px; line-height: 1.7; margin-bottom: 28px; }
+
+    .input-group { text-align: left; margin-bottom: 14px; }
+    .input-group label { display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+    .input-group input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 11px 13px;
+      font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .input-group input:focus { border-color: var(--green); }
+    .input-group input::placeholder { color: var(--muted); }
+
+    .uri-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid rgba(29,185,84,0.4);
+      border-radius: 8px; padding: 11px 13px;
+    }
+    .uri-box span {
+      flex: 1; font-size: 12px; color: var(--green);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-family: 'DM Mono', monospace;
+    }
+    .uri-copy {
+      flex-shrink: 0; font-size: 10px; font-family: 'DM Mono', monospace;
+      background: rgba(29,185,84,0.12); border: 1px solid rgba(29,185,84,0.3);
+      color: var(--green); border-radius: 4px; padding: 4px 10px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .uri-copy:hover { background: rgba(29,185,84,0.22); }
+
+    .setup-steps {
+      margin-top: 20px;
+      background: rgba(200,169,110,0.06); border: 1px solid rgba(200,169,110,0.18);
+      border-radius: 10px; padding: 16px; text-align: left;
+      font-size: 11px; color: var(--gold-dim); line-height: 2;
+    }
+    .setup-steps strong { color: var(--gold); }
+    .setup-steps a { color: var(--gold); text-decoration: underline; }
+    .setup-steps ol { padding-left: 18px; }
+
+    /* APP */
+    #app-panel { display: none; }
+    #app-panel.visible { display: block; }
+    .app-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 0 0; flex-wrap: wrap; gap: 16px;
+    }
+    .app-nav h2 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; }
+    .app-nav h2 span { color: var(--gold); }
+
+    /* PLAYLISTS */
+    #playlists-section { padding: 28px 0; }
+    .section-label {
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .playlists-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 16px; }
+    .playlist-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; cursor: pointer;
+      transition: all 0.2s ease; animation: slideIn 0.3s ease both;
+    }
+    .playlist-card:hover { border-color: #444; transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+    .playlist-card:hover .playlist-overlay { opacity: 1; }
+    .playlist-art { aspect-ratio: 1; background: var(--surface2); position: relative; overflow: hidden; }
+    .playlist-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .playlist-art-placeholder {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%); font-size: 36px;
+    }
+    .playlist-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .playlist-overlay-btn {
+      background: var(--green); color: #000; border: none; border-radius: 50%;
+      width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .playlist-info { padding: 12px; }
+    .playlist-info h3 {
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+      margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .playlist-info p { font-size: 11px; color: var(--muted); }
+
+    /* TRACKS */
+    #tracks-section { padding: 28px 0; }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--muted); cursor: pointer; margin-bottom: 24px;
+      transition: color 0.15s; background: none; border: none; font-family: 'DM Mono', monospace;
+    }
+    .back-btn:hover { color: var(--text); }
+    .current-playlist-header { display: flex; gap: 24px; align-items: flex-end; margin-bottom: 32px; flex-wrap: wrap; }
+    .current-playlist-art { width: 100px; height: 100px; border-radius: 10px; object-fit: cover; background: var(--surface2); flex-shrink: 0; }
+    .current-playlist-meta h2 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; margin-bottom: 6px; }
+    .current-playlist-meta p { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+    .playlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .tracks-list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .tracks-header {
+      display: grid; grid-template-columns: 48px 1fr 1fr 90px 100px;
+      padding: 10px 16px; background: var(--surface2);
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    .track-row {
+      display: grid; grid-template-columns: 48px 1fr 1fr 90px 100px;
+      padding: 12px 16px; align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s; animation: slideIn 0.3s ease both;
+    }
+    .track-row:last-child { border-bottom: none; }
+    .track-row:hover { background: var(--surface2); }
+    .track-num { font-size: 12px; color: var(--muted); text-align: center; }
+    .track-title-cell { min-width: 0; padding-right: 12px; }
+    .track-title-cell h4 {
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+    }
+    .track-title-cell span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .track-album { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px; }
+    .track-duration { font-size: 11px; color: var(--muted); text-align: center; }
+    .track-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .icon-btn {
+      width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 6px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; font-size: 13px;
+    }
+    .icon-btn:hover { background: var(--surface2); color: var(--text); border-color: #444; }
+    .icon-btn.yt { border-color: rgba(255,0,0,0.3); color: rgba(255,80,80,0.8); }
+    .icon-btn.yt:hover { background: rgba(255,0,0,0.1); color: #ff5050; }
+    .icon-btn.deezer { border-color: rgba(200,169,110,0.3); color: rgba(200,169,110,0.8); }
+    .icon-btn.deezer:hover { background: rgba(200,169,110,0.08); color: var(--gold); }
+
+    .loader { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px 0; color: var(--muted); font-size: 12px; }
+    .spinner { width: 36px; height: 36px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    #toast {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 20px; font-size: 13px; z-index: 1000;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    .disclaimer {
+      margin-top: 48px; padding: 20px;
+      border: 1px solid rgba(200,169,110,0.15); border-radius: 10px;
+      background: rgba(200,169,110,0.04);
+      font-size: 11px; color: var(--gold-dim); line-height: 1.7; text-align: center;
+    }
+    .disclaimer strong { color: var(--gold); }
+
+    @media (max-width: 700px) {
+      .tracks-header { grid-template-columns: 36px 1fr 80px; }
+      .tracks-header .col-album, .tracks-header .col-dur { display: none; }
+      .track-row { grid-template-columns: 36px 1fr 80px; }
+      .track-album, .track-duration { display: none; }
+    }
+    .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); font-size: 13px; }
+    .empty-state .emoji { font-size: 48px; margin-bottom: 16px; display: block; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      </div>
+      <div class="logo-text">
+        <h1>Playlist Extract</h1>
+        <span>Spotify → MP3</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="user-badge">
+        <img id="user-avatar" src="" alt=""/>
+        <span id="user-name"></span>
+      </div>
+      <button class="btn btn-ghost" id="logout-btn" style="display:none" onclick="logout()">↩ Logout</button>
+    </div>
+  </header>
+
+  <!-- SETUP PANEL -->
+  <div id="setup-panel">
+    <div class="setup-card">
+      <h2>Extract your<br/><em>Spotify</em> playlists</h2>
+      <p>Connect via your own Spotify Developer App. Free and takes 2 minutes.</p>
+
+      <div class="input-group">
+        <label>① Copy this Redirect URI — paste it exactly into your Spotify app settings</label>
+        <div class="uri-box">
+          <span id="redirect-uri-display">—</span>
+          <button class="uri-copy" id="copy-btn" onclick="copyUri()">Copy</button>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>② Paste your Spotify Client ID</label>
+        <input type="text" id="client-id-input" placeholder="e.g. 4b3c2a1d0e9f8a7b6c5d4e3f" autocomplete="off" spellcheck="false"/>
+      </div>
+
+      <button class="btn btn-primary" onclick="startAuth()" style="width:100%;justify-content:center;padding:14px;margin-top:4px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        ③ Connect with Spotify
+      </button>
+
+      <div class="setup-steps">
+        <strong>Full setup guide:</strong>
+        <ol>
+          <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a></li>
+          <li>Click <strong>Create app</strong> (any name/description)</li>
+          <li>In <strong>Redirect URIs</strong> field, paste the green URI shown above</li>
+          <li>Under <strong>Which API/SDKs are you planning to use?</strong> tick <strong>Web API</strong></li>
+          <li>Click <strong>Save</strong>, then copy your <strong>Client ID</strong> from the app overview</li>
+          <li>Paste it above and click Connect</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP PANEL -->
+  <div id="app-panel">
+    <div class="app-nav">
+      <h2 id="app-title">Your <span>Playlists</span></h2>
+      <button class="btn btn-ghost btn-sm" onclick="loadPlaylists()">↻ Refresh</button>
+    </div>
+
+    <div id="playlists-section">
+      <div class="section-label">Select a playlist to extract</div>
+      <div id="playlists-grid" class="playlists-grid"></div>
+    </div>
+
+    <div id="tracks-section" style="display:none">
+      <button class="back-btn" onclick="showPlaylists()">← Back to Playlists</button>
+      <div class="current-playlist-header">
+        <img id="cp-art" class="current-playlist-art" src="" alt=""/>
+        <div class="current-playlist-meta">
+          <h2 id="cp-name"></h2>
+          <p id="cp-meta"></p>
+          <div class="playlist-actions">
+            <button class="btn btn-primary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+            <button class="btn btn-gold btn-sm" onclick="openAllYoutube()">▶ Open All on YouTube</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyTrackList()">⎘ Copy Track List</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tracks-list">
+        <div class="tracks-header">
+          <span>#</span>
+          <span>Title</span>
+          <span class="col-album">Album</span>
+          <span class="col-dur" style="text-align:center">Duration</span>
+          <span style="text-align:right">Find</span>
+        </div>
+        <div id="tracks-list-body"></div>
+      </div>
+
+      <div class="disclaimer">
+        <strong>Note:</strong> Spotify's API does not provide audio downloads. The <strong>YT</strong> button searches YouTube — use <em>yt-dlp</em> or <em>cobalt.tools</em> to then download. The <strong>♪</strong> button opens Deezer. Always respect copyright laws.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────
+let accessToken = null;
+let currentTracks = [];
+let currentPlaylistName = '';
+
+const SCOPES = 'playlist-read-private playlist-read-collaborative user-read-private user-read-email';
+
+// ── REDIRECT URI ───────────────────────────────
+// Strip query string and hash — must exactly match what's in Spotify dashboard
+function getRedirectUri() {
+  return window.location.origin + window.location.pathname;
+}
+
+function copyUri() {
+  navigator.clipboard.writeText(getRedirectUri()).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+// ── PKCE ───────────────────────────────────────
+function randomStr(len) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+}
+
+async function s256(plain) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// ── START AUTH ─────────────────────────────────
+async function startAuth() {
+  const clientId = document.getElementById('client-id-input').value.trim();
+  if (!clientId) { showToast('⚠ Paste your Client ID first'); return; }
+
+  // Clear any stale state
+  ['sp_token','sp_exp','sp_rt','sp_cv','sp_ru'].forEach(k => localStorage.removeItem(k));
+
+  const verifier     = randomStr(64);
+  const challenge    = await s256(verifier);
+  const redirectUri  = getRedirectUri();
+
+  localStorage.setItem('sp_cid', clientId);
+  localStorage.setItem('sp_cv',  verifier);
+  localStorage.setItem('sp_ru',  redirectUri);
+
+  const url = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+    response_type:          'code',
+    client_id:              clientId,
+    scope:                  SCOPES,
+    redirect_uri:           redirectUri,
+    code_challenge_method:  'S256',
+    code_challenge:         challenge,
+    show_dialog:            'true'
+  });
+
+  window.location.href = url;
+}
+
+// ── TOKEN EXCHANGE ─────────────────────────────
+async function exchangeCode(code) {
+  const clientId   = localStorage.getItem('sp_cid');
+  const verifier   = localStorage.getItem('sp_cv');
+  const redirectUri = localStorage.getItem('sp_ru');
+
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'authorization_code',
+      code,
+      redirect_uri:  redirectUri,
+      client_id:     clientId,
+      code_verifier: verifier
+    })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error_description || d.error || 'Token exchange failed');
+
+  storeTokens(d);
+}
+
+async function doRefresh() {
+  const rt  = localStorage.getItem('sp_rt');
+  const cid = localStorage.getItem('sp_cid');
+  if (!rt || !cid) return false;
+  try {
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: rt, client_id: cid })
+    });
+    if (!r.ok) return false;
+    storeTokens(await r.json());
+    return true;
+  } catch { return false; }
+}
+
+function storeTokens(d) {
+  accessToken = d.access_token;
+  localStorage.setItem('sp_token', d.access_token);
+  localStorage.setItem('sp_exp',   Date.now() + d.expires_in * 1000);
+  if (d.refresh_token) localStorage.setItem('sp_rt', d.refresh_token);
+}
+
+function logout() {
+  accessToken = null;
+  ['sp_token','sp_exp','sp_rt','sp_cv','sp_ru'].forEach(k => localStorage.removeItem(k));
+  showSetup();
+}
+
+// ── INIT ───────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  // Always show the redirect URI
+  document.getElementById('redirect-uri-display').textContent = getRedirectUri();
+
+  const savedCid = localStorage.getItem('sp_cid');
+  if (savedCid) document.getElementById('client-id-input').value = savedCid;
+
+  const qs = new URLSearchParams(window.location.search);
+
+  // OAuth error
+  if (qs.has('error')) {
+    history.replaceState({}, '', window.location.pathname);
+    showToast('⚠ Spotify said: ' + qs.get('error'));
+    showSetup(); return;
+  }
+
+  // OAuth success — exchange code for token
+  if (qs.has('code')) {
+    history.replaceState({}, '', window.location.pathname);
+    try {
+      await exchangeCode(qs.get('code'));
+      loadPlaylists(); return;
+    } catch(e) {
+      showToast('⚠ ' + e.message);
+      showSetup(); return;
+    }
+  }
+
+  // Stored valid token
+  const t   = localStorage.getItem('sp_token');
+  const exp = parseInt(localStorage.getItem('sp_exp') || '0');
+  if (t && Date.now() < exp - 60000) { accessToken = t; loadPlaylists(); return; }
+
+  // Try silent refresh
+  if (await doRefresh()) { loadPlaylists(); return; }
+
+  showSetup();
+});
+
+// ── SPOTIFY API ────────────────────────────────
+async function apiFetch(url) {
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+  if (r.status === 401) { logout(); throw new Error('Session expired — please reconnect'); }
+
+  const text = await r.text();
+  let data;
+  try { data = JSON.parse(text); } catch(_) { data = null; }
+
+  if (!r.ok) {
+    if (r.status === 403) throw new Error('403 Forbidden — add your email in Spotify Dashboard → Settings → User Management');
+    const msg = data?.error?.message || data?.error || text.slice(0, 120) || ('HTTP ' + r.status);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function fetchAll(url) {
+  let items = [], next = url;
+  while (next) {
+    const d = await apiFetch(next);
+    items = items.concat(d.items || []);
+    next = d.next;
+  }
+  return items;
+}
+
+// ── UI HELPERS ─────────────────────────────────
+function showSetup() {
+  document.getElementById('setup-panel').style.display = '';
+  document.getElementById('app-panel').classList.remove('visible');
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('user-badge').classList.remove('visible');
+}
+
+function showApp() {
+  document.getElementById('setup-panel').style.display = 'none';
+  document.getElementById('app-panel').classList.add('visible');
+  document.getElementById('logout-btn').style.display = '';
+}
+
+function loader(id) {
+  document.getElementById(id).innerHTML =
+    '<div class="loader"><div class="spinner"></div><span>Loading…</span></div>';
+}
+
+function showToast(msg, ms = 3500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function fmt(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+}
+
+// ── PLAYLISTS ──────────────────────────────────
+async function loadPlaylists() {
+  showApp();
+  document.getElementById('playlists-section').style.display = '';
+  document.getElementById('tracks-section').style.display = 'none';
+  document.getElementById('app-title').innerHTML = 'Your <span>Playlists</span>';
+  loader('playlists-grid');
+
+  try {
+    const me = await apiFetch('https://api.spotify.com/v1/me');
+    document.getElementById('user-name').textContent = me.display_name || me.id;
+    document.getElementById('user-avatar').src = me.images?.[0]?.url
+      || `https://ui-avatars.com/api/?name=${encodeURIComponent(me.display_name||'U')}&background=1DB954&color=000&size=48`;
+    document.getElementById('user-badge').classList.add('visible');
+
+    const lists = await fetchAll('https://api.spotify.com/v1/me/playlists?limit=50');
+    renderPlaylists(lists);
+  } catch(e) {
+    document.getElementById('playlists-grid').innerHTML =
+      `<div class="empty-state"><span class="emoji">⚠️</span>
+      <strong style="color:#e8e8e8">${esc(e.message)}</strong><br/><br/>
+      <span style="font-size:11px;line-height:1.8">
+        If you see <em>403</em> or <em>Forbidden</em>:<br/>
+        Go to your <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:#1DB954">Spotify Dashboard</a>
+        → your app → <strong>User Management</strong><br/>
+        and add your Spotify account email as a user.
+      </span></div>`;
+  }
+}
+
+function renderPlaylists(lists) {
+  const grid = document.getElementById('playlists-grid');
+  if (!lists.length) {
+    grid.innerHTML = '<div class="empty-state"><span class="emoji">🎵</span>No playlists found.</div>';
+    return;
+  }
+  grid.innerHTML = lists.map((pl, i) => {
+    const art = pl.images?.[0]?.url
+      ? `<img src="${esc(pl.images[0].url)}" alt="" loading="lazy"/>`
+      : `<div class="playlist-art-placeholder">🎵</div>`;
+    return `<div class="playlist-card" style="animation-delay:${i*0.03}s"
+        onclick="loadTracks('${esc(pl.id)}','${esc(pl.name)}')">
+        <div class="playlist-art">${art}
+          <div class="playlist-overlay"><button class="playlist-overlay-btn">▶</button></div>
+        </div>
+        <div class="playlist-info">
+          <h3 title="${esc(pl.name)}">${esc(pl.name)}</h3>
+          <p>${pl.tracks?.total ?? '?'} tracks</p>
+        </div></div>`;
+  }).join('');
+}
+
+// ── TRACKS ─────────────────────────────────────
+async function loadTracks(id, name) {
+  document.getElementById('playlists-section').style.display = 'none';
+  document.getElementById('tracks-section').style.display = '';
+  document.getElementById('app-title').innerHTML = `<span>${esc(name)}</span>`;
+  currentPlaylistName = name;
+  document.getElementById('cp-name').textContent = name;
+  document.getElementById('cp-meta').textContent = 'Loading…';
+  document.getElementById('tracks-list-body').innerHTML =
+    '<div class="loader"><div class="spinner"></div><span>Fetching tracks…</span></div>';
+
+  try {
+    const pl  = await apiFetch(`https://api.spotify.com/v1/playlists/${id}?fields=images,owner.display_name`);
+    if (pl.images?.[0]?.url) document.getElementById('cp-art').src = pl.images[0].url;
+
+    const raw = await fetchAll(`https://api.spotify.com/v1/playlists/${id}/tracks?limit=100`);
+    currentTracks = raw.filter(i => i?.track?.name).map(i => ({
+      name:     i.track.name,
+      artists:  i.track.artists.map(a => a.name).join(', '),
+      album:    i.track.album?.name || '',
+      duration: i.track.duration_ms
+    }));
+
+    document.getElementById('cp-meta').textContent =
+      `${currentTracks.length} tracks • by ${pl.owner?.display_name || 'Unknown'}`;
+    renderTracks();
+  } catch(e) {
+    document.getElementById('tracks-list-body').innerHTML =
+      '<div class="empty-state"><span class="emoji">⚠️</span>Failed to load tracks.</div>';
+  }
+}
+
+function renderTracks() {
+  const body = document.getElementById('tracks-list-body');
+  if (!currentTracks.length) {
+    body.innerHTML = '<div class="empty-state"><span class="emoji">🎵</span>No tracks.</div>';
+    return;
+  }
+  body.innerHTML = currentTracks.map((t, i) => `
+    <div class="track-row" style="animation-delay:${Math.min(i,30)*0.025}s">
+      <span class="track-num">${i+1}</span>
+      <div class="track-title-cell">
+        <h4 title="${esc(t.name)}">${esc(t.name)}</h4>
+        <span>${esc(t.artists)}</span>
+      </div>
+      <span class="track-album" title="${esc(t.album)}">${esc(t.album)}</span>
+      <span class="track-duration">${fmt(t.duration)}</span>
+      <div class="track-actions">
+        <button class="icon-btn yt" title="Search on YouTube"
+          onclick="openYT('${esc(t.name)} ${esc(t.artists)}')">▶</button>
+        <button class="icon-btn deezer" title="Find on Deezer"
+          onclick="openDeezer('${esc(t.name)} ${esc(t.artists)}')">♪</button>
+      </div>
+    </div>`).join('');
+}
+
+function showPlaylists() {
+  document.getElementById('tracks-section').style.display = 'none';
+  document.getElementById('playlists-section').style.display = '';
+  document.getElementById('app-title').innerHTML = 'Your <span>Playlists</span>';
+}
+
+// ── ACTIONS ────────────────────────────────────
+function openYT(q)     { window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(q),'_blank'); }
+function openDeezer(q) { window.open('https://www.deezer.com/search/'+encodeURIComponent(q),'_blank'); }
+
+function openAllYoutube() {
+  const n = Math.min(currentTracks.length, 10);
+  showToast(`Opening ${n} YouTube tabs…`);
+  currentTracks.slice(0,n).forEach((t,i) =>
+    setTimeout(() => openYT(t.name+' '+t.artists), i*350));
+}
+
+function exportCSV() {
+  if (!currentTracks.length) return;
+  const rows = [['#','Title','Artists','Album','Duration']].concat(
+    currentTracks.map((t,i) => [
+      i+1,
+      `"${t.name.replace(/"/g,'""')}"`,
+      `"${t.artists.replace(/"/g,'""')}"`,
+      `"${t.album.replace(/"/g,'""')}"`,
+      fmt(t.duration)
+    ])
+  );
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
+  a.download = currentPlaylistName.replace(/[^a-z0-9]/gi,'_')+'.csv';
+  a.click();
+  showToast('✓ CSV downloaded');
+}
+
+function copyTrackList() {
+  const text = currentTracks.map((t,i)=>`${i+1}. ${t.name} — ${t.artists}`).join('\n');
+  navigator.clipboard.writeText(text).then(()=>showToast('✓ Copied to clipboard'));
+}
+</script>
+</body>
+</html>
