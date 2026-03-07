@@ -72,7 +72,7 @@
       const res  = await fetch(API, {
         headers: {
           Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${TOKEN}`,
+          Authorization: `token ${TOKEN}`,
         }
       });
 
@@ -98,7 +98,7 @@
         method: 'PUT',
         headers: {
           Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${TOKEN}`,
+          Authorization: `token ${TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
